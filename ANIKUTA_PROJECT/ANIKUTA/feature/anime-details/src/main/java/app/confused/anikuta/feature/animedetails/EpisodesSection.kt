@@ -214,6 +214,7 @@ fun EpisodesSection(
                 onSearchManually = { showManualSearch = true },
                 autoMatchErrors = autoMatchErrors,
             )
+            is EpisodeState.NotReleased -> NotReleasedState()
             is EpisodeState.Error -> EpisodesErrorState(episodeState.message)
         }
     }

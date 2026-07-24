@@ -216,3 +216,34 @@ internal fun EpisodesErrorState(message: String) {
         )
     }
 }
+
+/**
+ * State shown when the anime is not yet released on AniList.
+ *
+ * Per user: "the anime which are marked as not yet released on AniList will
+ * not be searched for the new episodes... it will say that this anime has
+ * not yet been released."
+ */
+@Composable
+internal fun NotReleasedState() {
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Text(
+            text = "Not yet released",
+            fontFamily = RobotoFamily,
+            fontSize = 15.sp,
+            fontWeight = FontWeight.ExtraBold,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(modifier = Modifier.height(6.dp))
+        Text(
+            text = "This anime has not yet been released. Episodes will be available once it starts airing.",
+            fontFamily = RobotoFamily,
+            fontSize = 12.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+        )
+    }
+}

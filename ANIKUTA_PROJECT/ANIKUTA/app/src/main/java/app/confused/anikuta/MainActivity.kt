@@ -421,8 +421,10 @@ private fun AnikutaApp() {
                         ))
                     },
                     onRelinkAnilist = {
-                        // Close the extension page + open the linking sheet
-                        extensionDetailTarget = null
+                        // Open the linking sheet as an overlay — don't close the extension page.
+                        // The sheet renders on top (at the bottom of AnikutaApp).
+                        // If linking succeeds, onLinked will close the extension page +
+                        // open the normal details page.
                         linkingTarget = extSource to extSAnime
                     },
                 )
@@ -544,6 +546,7 @@ private fun AnikutaApp() {
                 linkStore = extensionLinkStore,
                 onLinked = { anilistId, wasCached ->
                     linkingTarget = null
+                    extensionDetailTarget = null // Close the extension page if open
                     if (!wasCached) {
                         Toast.makeText(context, "Linked to AniList", Toast.LENGTH_SHORT).show()
                         Log.i("AnikutaSearch", "Linked (fresh): ${sAnime.title} → AniList $anilistId")

@@ -440,7 +440,16 @@ class AnimeDetailViewModel(
                 val anime = api.fetchById(anilistId)
                 if (anime != null) {
                     _animeState.value = DetailState.Success(anime)
-                    findAndLoadEpisodes(anime)
+                    // Check if the anime is not yet released — don't search for sources.
+                    // Per user: "the anime which are marked as not yet released on AniList
+                    // will not be searched for the new episodes... it will say that this
+                    // anime has not yet been released."
+                    if (anime.status == "NOT_YET_RELEASED") {
+                        _episodeState.value = EpisodeState.NotReleased
+                        Log.i(TAG, "Anime $anilistId is NOT_YET_RELEASED — skipping source search")
+                    } else {
+                        findAndLoadEpisodes(anime)
+                    }
                 } else {
                     _animeState.value = DetailState.Error("Anime not found")
                 }
@@ -771,5 +780,6 @@ sealed interface EpisodeState {
     data class Loading(val sourceName: String) : EpisodeState
     data class Loaded(val episodes: List<SEpisode>, val sourceName: String) : EpisodeState
     data object NoMatch : EpisodeState
+    data object NotReleased : EpisodeState
     data class Error(val message: String) : EpisodeState
 }
