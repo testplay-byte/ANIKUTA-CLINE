@@ -59,6 +59,7 @@ class AnimeDetailViewModel(
     private val sourceMatcher: SourceMatcher,
     private val animeRepository: AnimeRepository,
     private val categoryRepository: CategoryRepository,
+    private val episodeRepository: app.confused.anikuta.core.common.repository.EpisodeRepository,
     private val extensionLinkStore: app.confused.anikuta.data.extension.cache.ExtensionLinkStore,
     private val sourceLinkStore: app.confused.anikuta.data.extension.cache.SourceLinkStore,
     private val episodeMetadataRepository: app.confused.anikuta.core.episodemetadata.repository.EpisodeMetadataRepository,
@@ -458,20 +459,50 @@ class AnimeDetailViewModel(
 
     private fun findAndLoadEpisodes(anime: AniListAnime) {
         viewModelScope.launch {
-            // ── Check SourceLinkStore first: if we already have a saved match,
-            // skip the search entirely and directly load episodes from that source.
-            // Per user: "the source was not saved either... it tries to search on
-            // the sources every single time instead of directly knowing that this
-            // source is already linked."
+            // ── Check DB first: if we already have episodes saved, show them instantly.
+            // Per user: "it should properly show things from local storage... never
+            // automatically reload anything until it is the first time."
+            val dbAnime = animeRepository.getByAnilistId(anilistId)
+            if (dbAnime != null) {
+                val dbEpisodes = episodeRepository.getByAnimeId(dbAnime.id)
+                if (dbEpisodes.isNotEmpty()) {
+                    Log.i(TAG, "Loaded ${dbEpisodes.size} episodes from DB (instant) for animeId=${dbAnime.id}")
+                    // Convert DB Episodes back to SEpisodes for the UI
+                    val sEpisodes = dbEpisodes.map { it.toSEpisode() }
+                    // Get the source name from the saved link
+                    val savedLink = sourceLinkStore.getLink(anilistId)
+                    val sourceName = savedLink?.let { link ->
+                        sourceMatcher.getSourceById(link.sourceId)?.name
+                    } ?: "Unknown"
+                    _episodeState.value = EpisodeState.Loaded(sEpisodes, sourceName)
+
+                    // Still set up the source match for the source switcher
+                    if (savedLink != null) {
+                        val source = sourceMatcher.getSourceById(savedLink.sourceId)
+                        if (source != null) {
+                            val sAnime = eu.kanade.tachiyomi.animesource.model.SAnimeImpl().apply {
+                                url = savedLink.animeUrl
+                                title = savedLink.animeTitle
+                            }
+                            _currentMatch.value = SourceMatcher.SourceMatch(source, sAnime, 1.0)
+                        }
+                    }
+                    // Search for other sources in the background (for the switcher)
+                    launch { searchAllSourcesInBackground(anime.displayTitle) }
+                    // Load episode metadata from the metadata repo (also cached)
+                    launch { fetchEpisodeMetadata(sEpisodes.size) }
+                    return@launch
+                }
+            }
+
+            // ── No DB episodes — check SourceLinkStore for a saved source match
             val savedLink = sourceLinkStore.getLink(anilistId)
             if (savedLink != null) {
                 Log.i(TAG, "Found saved source link: sourceId=${savedLink.sourceId}, url=${savedLink.animeUrl}")
-                // Find the source by ID from the source matcher
                 val source = withContext(Dispatchers.IO) {
                     sourceMatcher.getSourceById(savedLink.sourceId)
                 }
                 if (source != null) {
-                    // Reconstruct SAnime from the saved URL + title
                     val sAnime = eu.kanade.tachiyomi.animesource.model.SAnimeImpl().apply {
                         url = savedLink.animeUrl
                         title = savedLink.animeTitle
@@ -479,13 +510,10 @@ class AnimeDetailViewModel(
                     val match = SourceMatcher.SourceMatch(source, sAnime, 1.0)
                     _currentMatch.value = match
                     _allMatches.value = listOf(match)
-                    // Still search for other matches in the background (for the switcher)
-                    // but DON'T block episode loading on it.
                     launch { searchAllSourcesInBackground(anime.displayTitle) }
                     loadEpisodes(match)
                     return@launch
                 } else {
-                    // Source not found (extension uninstalled?) — fall through to search
                     Log.w(TAG, "Saved source ${savedLink.sourceId} not found — falling back to search")
                     sourceLinkStore.removeLink(anilistId)
                 }
@@ -531,7 +559,7 @@ class AnimeDetailViewModel(
                         "preferredId=$preferredSourceId, explicit=$explicitPrefId, linked=$linkedPrefId)",
                 )
 
-                // ── Save the source link so we don't re-search next time ──
+                // Save the source link so we don't re-search next time
                 sourceLinkStore.saveLink(
                     anilistId = anilistId,
                     sourceId = selected.source.id,
@@ -576,18 +604,98 @@ class AnimeDetailViewModel(
                     _episodeState.value = EpisodeState.Loaded(episodes, match.source.name)
                     Log.i(TAG, "Loaded ${episodes.size} episodes from '${match.source.name}'")
 
+                    // ── Save episodes to the DB for offline access + instant re-open ──
+                    // Per user: "the information of the episodes is properly saved...
+                    // I want to be able to see episodes in offline mode too."
+                    saveEpisodesToDb(episodes)
+
                     // ── Fetch episode metadata in the background ──
-                    // Enriches the episode list with titles, descriptions, thumbnails,
-                    // and air dates from AniList/Jikan/Anikage sources.
                     fetchEpisodeMetadata(episodes.size)
                 }
             } catch (e: Throwable) {
-                // Catch Throwable — see loadAnimeDetails for rationale.
                 Log.e(TAG, "Failed to load episodes from '${match.source.name}'", e)
                 val msg = "Failed to load episodes: ${e.message}"
                 _episodeState.value = EpisodeState.Error(msg)
                 Toast.makeText(appContext, msg, Toast.LENGTH_LONG).show()
             }
+        }
+    }
+
+    /**
+     * Saves fetched SEpisodes to the SQLDelight DB via EpisodeRepository.
+     * First ensures the anime exists in the DB (upsert), then deletes old
+     * episodes + inserts the new ones.
+     */
+    private suspend fun saveEpisodesToDb(episodes: List<SEpisode>) {
+        try {
+            // Ensure the anime exists in the DB
+            var dbAnime = animeRepository.getByAnilistId(anilistId)
+            if (dbAnime == null) {
+                // Create a minimal anime entry (the full data comes from AniList)
+                val anilistAnime = (_animeState.value as? DetailState.Success)?.anime
+                val newAnime = app.confused.anikuta.core.common.model.Anime(
+                    id = 0,
+                    url = "",
+                    title = anilistAnime?.displayTitle ?: "",
+                    artist = null,
+                    author = null,
+                    description = anilistAnime?.description,
+                    genre = anilistAnime?.genres?.joinToString(",") ?: "",
+                    coverUrl = anilistAnime?.coverUrl,
+                    status = 0,
+                    thumbnailUrl = null,
+                    favorite = false,
+                    sourceId = 0,
+                    dateAdded = System.currentTimeMillis(),
+                    viewerFlags = 0,
+                    nextUpdate = 0,
+                    updateStrategy = 0,
+                    coverLastModified = 0,
+                    releaseDate = null,
+                    lastRefresh = System.currentTimeMillis(),
+                    lastMetadataFetch = null,
+                    nextEpisodeCheck = null,
+                    anilistId = anilistId,
+                    coverColor = null,
+                    score = anilistAnime?.averageScore?.toDouble(),
+                    totalEpisodes = anilistAnime?.episodes,
+                    lastWatched = 0,
+                    nextAiringEpisode = anilistAnime?.nextAiringEpisode?.episode,
+                )
+                val newId = animeRepository.upsert(newAnime)
+                Log.i(TAG, "Created anime in DB for anilistId=$anilistId, dbId=$newId")
+                dbAnime = animeRepository.getById(newId)
+            }
+
+            if (dbAnime != null) {
+                // Delete old episodes + insert new ones
+                episodeRepository.deleteByAnimeId(dbAnime.id)
+                episodes.forEachIndexed { index, ep ->
+                    episodeRepository.upsert(
+                        app.confused.anikuta.core.common.model.Episode(
+                            id = 0,
+                            animeId = dbAnime.id,
+                            url = ep.url,
+                            name = ep.name,
+                            episodeNumber = ep.episode_number,
+                            scanlator = ep.scanlator,
+                            seen = false,
+                            bookmark = false,
+                            lastSecondSeen = 0,
+                            totalSeconds = 0,
+                            sourceOrder = index.toLong(),
+                            dateFetch = System.currentTimeMillis(),
+                            dateUpload = ep.date_upload.takeIf { it > 0 },
+                            fillermark = if (ep.fillermark) "filler" else null,
+                            summary = ep.summary,
+                            previewUrl = ep.preview_url,
+                        ),
+                    )
+                }
+                Log.i(TAG, "Saved ${episodes.size} episodes to DB for animeId=${dbAnime.id}")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to save episodes to DB (non-fatal)", e)
         }
     }
 
@@ -627,6 +735,24 @@ class AnimeDetailViewModel(
     companion object {
         private const val TAG = "AnikutaDetailVM"
         private const val PREFS_NAME = "anikuta_source_prefs"
+    }
+}
+
+// ── Extension: convert DB Episode → SEpisode for the UI ──
+
+/** Converts a DB [Episode] back to an [SEpisode] for the UI layer. */
+private fun app.confused.anikuta.core.common.model.Episode.toSEpisode(): SEpisode {
+    return eu.kanade.tachiyomi.animesource.model.SAnimeImpl().let { _ ->
+        eu.kanade.tachiyomi.animesource.model.SEpisodeImpl().apply {
+            url = this@toSEpisode.url ?: ""
+            name = this@toSEpisode.name
+            episode_number = this@toSEpisode.episodeNumber
+            date_upload = this@toSEpisode.dateUpload ?: 0
+            scanlator = this@toSEpisode.scanlator
+            summary = this@toSEpisode.summary
+            preview_url = this@toSEpisode.previewUrl
+            fillermark = this@toSEpisode.fillermark == "filler"
+        }
     }
 }
 
