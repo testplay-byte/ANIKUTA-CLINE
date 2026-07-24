@@ -30,6 +30,8 @@ interface AnimeRepository {
 
     suspend fun getByAnilistId(anilistId: Int): Anime?
 
+    suspend fun getBySourceAndUrl(sourceId: Long, url: String): Anime?
+
     suspend fun searchByName(query: String): List<Anime>
 
     suspend fun upsert(anime: Anime): Long

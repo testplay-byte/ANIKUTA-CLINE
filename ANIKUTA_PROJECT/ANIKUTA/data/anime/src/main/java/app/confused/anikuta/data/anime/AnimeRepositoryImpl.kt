@@ -58,6 +58,10 @@ class AnimeRepositoryImpl(
         database.animesQueries.selectByAnilistId(anilistId.toLong(), AnimeMapper::map)
             .executeAsOneOrNull()
 
+    override suspend fun getBySourceAndUrl(sourceId: Long, url: String): Anime? =
+        database.animesQueries.selectBySourceAndUrl(sourceId, url, AnimeMapper::map)
+            .executeAsOneOrNull()
+
     override suspend fun searchByName(query: String): List<Anime> =
         database.animesQueries.searchByName(query, AnimeMapper::map)
             .executeAsList()

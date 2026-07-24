@@ -62,11 +62,14 @@ class ExtensionDetailViewModel(
     private val _currentMatch = MutableStateFlow<SourceMatcher.SourceMatch?>(null)
     val currentMatch: StateFlow<SourceMatcher.SourceMatch?> = _currentMatch.asStateFlow()
 
+    private val _watchedEpisodes = MutableStateFlow<Set<String>>(emptySet())
+    val watchedEpisodes: StateFlow<Set<String>> = _watchedEpisodes.asStateFlow()
+
     init {
         loadExtensionAnime()
         // Check if this anime is already in the library (by sourceId + url)
         viewModelScope.launch {
-            val existing = findInLibrary()
+            val existing = animeRepository.getBySourceAndUrl(source.id, sAnime.url)
             _isSaved.value = existing?.favorite == true
             if (existing != null) {
                 // Load episodes from DB first
@@ -98,7 +101,7 @@ class ExtensionDetailViewModel(
             _currentMatch.value = SourceMatcher.SourceMatch(source, sAnime, 1.0)
 
             // Check DB for episodes first
-            val existing = findInLibrary()
+            val existing = animeRepository.getBySourceAndUrl(source.id, sAnime.url)
             if (existing == null || episodeRepository.getByAnimeId(existing.id).isEmpty()) {
                 // No DB episodes — fetch from source
                 loadEpisodesFromSource()
@@ -128,20 +131,9 @@ class ExtensionDetailViewModel(
         }
     }
 
-    private suspend fun findInLibrary(): Anime? {
-        // Search by sourceId + url (the unique identifier for extension anime)
-        val all = animeRepository.observeAll()
-        // Use a one-shot query — check if any anime with this sourceId + url exists
-        // Since we don't have a direct "getBySourceAndUrl" method, we search by sourceId
-        // and filter by url. This is a bit inefficient but works for now.
-        // TODO: add a getBySourceAndUrl method to AnimeRepository
-        val allAnime = animeRepository.searchByName(sAnime.title)
-        return allAnime.firstOrNull { it.sourceId == source.id && it.url == sAnime.url }
-    }
-
     private suspend fun saveEpisodesToDb(episodes: List<SEpisode>) {
         try {
-            var dbAnime = findInLibrary()
+            var dbAnime = animeRepository.getBySourceAndUrl(source.id, sAnime.url)
             if (dbAnime == null) {
                 // Create a minimal anime entry
                 val newAnime = Anime(
@@ -212,7 +204,7 @@ class ExtensionDetailViewModel(
     fun toggleSave() {
         viewModelScope.launch {
             try {
-                val existing = findInLibrary()
+                val existing = animeRepository.getBySourceAndUrl(source.id, sAnime.url)
                 if (existing != null) {
                     val newFav = !existing.favorite
                     animeRepository.updateFavorite(
