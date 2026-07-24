@@ -173,13 +173,21 @@ private fun AnikutaApp() {
         mutableStateOf<Pair<AnimeCatalogueSource, SAnime>?>(null)
     }
 
+    // Extension-only details page target (when user taps "Go without linking").
+    // Per user: "the extension-only details page... the extension provides quite
+    // a lot of details too."
+    var extensionDetailTarget by remember {
+        mutableStateOf<Pair<AnimeCatalogueSource, SAnime>?>(null)
+    }
+
     // Handle back gesture for sub-screens + resolver sheet + linking sheet + episode-settings sub-pages
     // ── Agent 1: History + Updates ── + ── Agent 2: Profile + Trackers ──
-    BackHandler(enabled = watchTarget != null || detailAnimeId != null || showExtensions || showSettings || showRepoSettings || resolverState !is VideoResolverState.Hidden || linkingTarget != null || episodeSettingsPage != null || showHistory || showUpdates || showProfile || showTrackers) {
+    BackHandler(enabled = watchTarget != null || detailAnimeId != null || showExtensions || showSettings || showRepoSettings || resolverState !is VideoResolverState.Hidden || linkingTarget != null || extensionDetailTarget != null || episodeSettingsPage != null || showHistory || showUpdates || showProfile || showTrackers) {
         when {
             watchTarget != null -> watchTarget = null
             resolverState !is VideoResolverState.Hidden -> resolverState = VideoResolverState.Hidden
             linkingTarget != null -> linkingTarget = null
+            extensionDetailTarget != null -> extensionDetailTarget = null
             episodeSettingsPage != null -> {
                 // Pop sub-page → Hub; Hub → exit the flow entirely.
                 episodeSettingsPage =
@@ -399,6 +407,21 @@ private fun AnikutaApp() {
                     },
                 )
             }
+            // ── Extension-only details page (for anime not on AniList) ──
+            extensionDetailTarget != null -> {
+                val (extSource, extSAnime) = extensionDetailTarget!!
+                app.confused.anikuta.feature.animedetails.ExtensionDetailScreen(
+                    source = extSource,
+                    sAnime = extSAnime,
+                    onBack = { extensionDetailTarget = null },
+                    onOpenEpisode = { episode, source, episodeList ->
+                        resolveEpisode(episode, source, episodeList, app.confused.anikuta.feature.animedetails.WatchEpisodeContext(
+                            animeTitle = extSAnime.title,
+                            coverUrl = extSAnime.thumbnail_url,
+                        ))
+                    },
+                )
+            }
             // Tab content
             else -> {
                 when (currentRoute) {
@@ -526,12 +549,7 @@ private fun AnikutaApp() {
                 },
                 onGoWithoutLinking = { extSource, extSAnime ->
                     linkingTarget = null
-                    Toast.makeText(
-                        context,
-                        "Extension-only detail page is a future enhancement. " +
-                            "Install the AniList-linked version to watch.",
-                        Toast.LENGTH_LONG,
-                    ).show()
+                    extensionDetailTarget = extSource to extSAnime
                     Log.i("AnikutaSearch", "Go-without-linking: ${extSAnime.title} from ${extSource.name}")
                 },
                 onDismiss = { linkingTarget = null },
