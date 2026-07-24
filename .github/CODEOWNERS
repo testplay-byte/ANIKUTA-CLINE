@@ -1,0 +1,26 @@
+# CODEOWNERS for ANI_KUTA_NEW
+# These are the default owners for changes in each area.
+# (Replace the @handle placeholder with the real owner when known.)
+
+# ── Root: single source of truth + orientation ──
+/ARCHITECTURE.md      @testplay-byte
+/README.md            @testplay-byte
+/AGENTS.md            @testplay-byte
+
+# ── Project documentation, planning, design language, agent context ──
+/DOCS/                @testplay-byte
+/PLANNING/            @testplay-byte
+/DESIGN_LANGUAGE/     @testplay-byte
+/AGENT_CONTEXT/       @testplay-byte
+/RULES/               @testplay-byte
+
+# ── The actual project ──
+/ANIKUTA_PROJECT/     @testplay-byte
+
+# ── Reference snapshots (frozen — changes here should be rare & deliberate) ──
+/ANIYOMI_REFRENCE/    @testplay-byte
+/OLD_ANIKUTA/         @testplay-byte
+/PROTOTYPE_REFERENCE/ @testplay-byte
+
+# ── CI / build pipelines ──
+/.github/             @testplay-byte
