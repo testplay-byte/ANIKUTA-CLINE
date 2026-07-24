@@ -228,6 +228,7 @@ fun EpisodesSection(
             results = manualSearchResults,
             errors = manualSearchErrors,
             hasSearched = hasSearched,
+            currentMatch = currentMatch,
             onManualSearch = onManualSearch,
             onLinkManual = { result ->
                 onLinkManual(result.source, result.sAnime)
@@ -340,8 +341,8 @@ private fun EpisodeRow(
     onClick: () -> Unit,
     onToggleWatched: () -> Unit,
 ) {
-    // Single lighter shade for ALL rows — no alternating zebra-stripe (per user request).
-    val cardColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f)
+    // Background matches the More screen button background (surfaceVariant@0.4f).
+    val cardColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
 
     // Apply preferences or use defaults
     val showThumbnail = displayPrefs?.showThumbnails ?: true

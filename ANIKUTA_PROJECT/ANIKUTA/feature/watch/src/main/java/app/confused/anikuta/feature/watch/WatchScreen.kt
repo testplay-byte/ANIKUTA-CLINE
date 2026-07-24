@@ -840,8 +840,12 @@ private fun WatchScreenContent(
 
             // Overlay: switching indicator or fullscreen controls
             if (isSwitching) {
+                val currentEp = watchRequest.episodeList.getOrNull(currentEpisodeIndex)
+                val epNumInt = currentEp?.episode_number?.toInt() ?: 0
+                val thumbnail = watchRequest.episodeMetadata[epNumInt]?.thumbnailUrl
+                    ?: currentEp?.preview_url
                 EpisodeSwitchingOverlay(
-                    episodeThumbnailUrl = null,
+                    episodeThumbnailUrl = thumbnail,
                     episodeTitle = watchRequest.videoTitle,
                     modifier = Modifier.fillMaxSize(),
                 )
@@ -897,8 +901,12 @@ private fun WatchScreenContent(
                     val errorMessage = stateHolder.errorMessage.collectAsStateWithLifecycle().value
                     when {
                         isSwitching -> {
+                            val currentEp = watchRequest.episodeList.getOrNull(currentEpisodeIndex)
+                            val epNumInt = currentEp?.episode_number?.toInt() ?: 0
+                            val thumbnail = watchRequest.episodeMetadata[epNumInt]?.thumbnailUrl
+                                ?: currentEp?.preview_url
                             EpisodeSwitchingOverlay(
-                                episodeThumbnailUrl = null,
+                                episodeThumbnailUrl = thumbnail,
                                 episodeTitle = stateHolder.currentVideoTitle.value,
                                 modifier = Modifier.fillMaxSize(),
                             )
@@ -1528,7 +1536,7 @@ private fun EpisodeRow(
     val cardColor = if (isCurrent) {
         MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
     } else {
-        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f)
+        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
     }
 
     Surface(

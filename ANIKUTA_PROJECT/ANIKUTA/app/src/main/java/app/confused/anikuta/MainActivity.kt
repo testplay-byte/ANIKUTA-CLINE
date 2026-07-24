@@ -143,7 +143,10 @@ private fun AnikutaApp() {
     // History + Updates full-screen sub-pages, reached from the More screen.
     var showHistory by remember { mutableStateOf(false) }
     var showUpdates by remember { mutableStateOf(false) }
-    val anilistApi = remember { AniListApi() }
+    val anilistApi = remember {
+        val prefStore = org.koin.core.context.GlobalContext.get().get<app.confused.anikuta.core.preferences.PreferenceStore>()
+        AniListApi(localCache = app.confused.anikuta.core.anilist.api.LocalAniListCache(prefStore))
+    }
     val extensionManager: AnimeExtensionManager = koinInject()
     val sourceMatcher: SourceMatcher = koinInject()
     val resolverService = remember { ResolverService() }

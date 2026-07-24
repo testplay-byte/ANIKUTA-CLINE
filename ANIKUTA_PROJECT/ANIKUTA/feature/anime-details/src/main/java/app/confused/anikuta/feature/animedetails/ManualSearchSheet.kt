@@ -92,6 +92,7 @@ fun ManualSearchSheet(
     results: List<SourceMatcher.ManualSearchResult>,
     errors: List<Pair<String, String>>,
     hasSearched: Boolean,
+    currentMatch: SourceMatcher.SourceMatch? = null,
     onManualSearch: suspend (Long, String) -> Unit,
     onLinkManual: (SourceMatcher.ManualSearchResult) -> Unit,
     onDismiss: () -> Unit,
@@ -154,6 +155,61 @@ fun ManualSearchSheet(
                         fontSize = 11.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
+                }
+            }
+
+            // ── Currently linked anime (if any) ──
+            // Per user: "it should show that it is currently connected to this
+            // anime by the extension text. Below it it should show that anime,
+            // that anime's name, and that anime's cover, and it should be
+            // highlighted properly."
+            if (currentMatch != null) {
+                Surface(
+                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                ) {
+                    Row(
+                        modifier = Modifier.padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        if (!currentMatch.sAnime.thumbnail_url.isNullOrBlank()) {
+                            AsyncImage(
+                                model = currentMatch.sAnime.thumbnail_url,
+                                contentDescription = currentMatch.sAnime.title,
+                                modifier = Modifier
+                                    .size(48.dp, 64.dp)
+                                    .clip(RoundedCornerShape(6.dp)),
+                                contentScale = ContentScale.Crop,
+                            )
+                            Spacer(modifier = Modifier.width(12.dp))
+                        }
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Currently connected to",
+                                fontFamily = RobotoFamily,
+                                fontSize = 10.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            Text(
+                                text = currentMatch.sAnime.title,
+                                fontFamily = RobotoFamily,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = MaterialTheme.colorScheme.primary,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                            Text(
+                                text = "via ${currentMatch.source.name}",
+                                fontFamily = RobotoFamily,
+                                fontSize = 11.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
                 }
             }
 

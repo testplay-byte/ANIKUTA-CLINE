@@ -34,6 +34,7 @@ import java.util.concurrent.TimeUnit
  */
 class AniListApi(
     private val client: OkHttpClient = defaultClient(),
+    private val localCache: LocalAniListCache? = null,
 ) {
     // In-memory cache for anime details (5-minute TTL).
     private val detailCache = mutableMapOf<Int, Pair<Long, AniListAnime>>()
@@ -47,16 +48,46 @@ class AniListApi(
     // Key: sorted-ID tuple. Value: (timestamp, results).
     private val airingCache = mutableMapOf<String, Pair<Long, List<AiringScheduleInfo>>>()
 
-    /** Fetch trending anime (with stale-while-revalidate caching). */
+    /**
+     * Fetch trending anime (with stale-while-revalidate caching).
+     *
+     * Checks the local persistent cache first (survives app restart). If the
+     * cache is fresh (< 24h), returns it without a network call. If stale,
+     * fetches from network + updates the cache. If the network fails, returns
+     * the stale cached data.
+     *
+     * Per user: "it should not auto refresh... only refresh once a day. It can
+     * be manually refreshed by the user by scrolling down."
+     */
     suspend fun fetchTrending(page: Int = 1, perPage: Int = 20): List<AniListAnime> {
-        val cacheKey = "trending_$page"
-        return cachedListQuery(cacheKey) { queryList(TRENDING_QUERY, page, perPage) }
+        // Check local persistent cache first (page 1 only — multi-page is rare)
+        if (page == 1 && localCache != null) {
+            val local = localCache.getCachedTrending()
+            if (local.isNotEmpty() && !localCache.isTrendingStale()) {
+                return local
+            }
+        }
+        val result = cachedListQuery("trending_$page") { queryList(TRENDING_QUERY, page, perPage) }
+        // Save to local cache (page 1 only)
+        if (page == 1 && localCache != null && result.isNotEmpty()) {
+            localCache.saveTrending(result)
+        }
+        return result
     }
 
     /** Fetch popular anime (with stale-while-revalidate caching). */
     suspend fun fetchPopular(page: Int = 1, perPage: Int = 20): List<AniListAnime> {
-        val cacheKey = "popular_$page"
-        return cachedListQuery(cacheKey) { queryList(POPULAR_QUERY, page, perPage) }
+        if (page == 1 && localCache != null) {
+            val local = localCache.getCachedPopular()
+            if (local.isNotEmpty() && !localCache.isPopularStale()) {
+                return local
+            }
+        }
+        val result = cachedListQuery("popular_$page") { queryList(POPULAR_QUERY, page, perPage) }
+        if (page == 1 && localCache != null && result.isNotEmpty()) {
+            localCache.savePopular(result)
+        }
+        return result
     }
 
     /** Search anime by query (NOT cached — search results change with the query). */
@@ -188,8 +219,11 @@ class AniListApi(
      * Returns null if no cache exists.
      */
     fun getCachedTrending(): List<AniListAnime>? {
+        // Check in-memory cache first
         val cached = listCache["trending_1"]
-        return cached?.second
+        if (cached != null) return cached.second
+        // Fall back to local persistent cache (survives app restart)
+        return localCache?.getCachedTrending()?.takeIf { it.isNotEmpty() }
     }
 
     /**
@@ -347,19 +381,40 @@ class AniListApi(
         }
     }
 
-    /** Fetch a single anime by its AniList ID (with 5-min in-memory cache). */
+    /**
+     * Fetch a single anime by its AniList ID (with 5-min in-memory cache +
+     * 24h local persistent cache).
+     *
+     * Per user: "when I close the app and open it again and click the same
+     * anime, it reloads the whole thing again. It should properly show things
+     * from local storage."
+     */
     suspend fun fetchById(id: Int): AniListAnime? {
-        // Check cache
+        // Check in-memory cache (5-min TTL)
         val cached = detailCache[id]
         if (cached != null && System.currentTimeMillis() - cached.first < cacheTtlMs) {
             return cached.second
         }
 
-        // Fetch from network
-        val result = fetchByIdFromNetwork(id) ?: return null
+        // Check local persistent cache (24h TTL — survives app restart)
+        if (localCache != null) {
+            val local = localCache.getCachedDetail(id)
+            if (local != null) {
+                // Populate in-memory cache too
+                detailCache[id] = System.currentTimeMillis() to local
+                return local
+            }
+        }
 
-        // Cache it
+        // Fetch from network
+        val result = fetchByIdFromNetwork(id) ?: run {
+            // Network failed — try returning stale local cache even if expired
+            return localCache?.getCachedDetail(id)
+        }
+
+        // Cache it (both in-memory + local persistent)
         detailCache[id] = System.currentTimeMillis() to result
+        localCache?.saveDetail(result)
         return result
     }
 

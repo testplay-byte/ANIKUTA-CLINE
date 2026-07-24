@@ -57,6 +57,7 @@ import kotlinx.coroutines.launch
  *
  * The screen content scrolls behind the floating bottom nav (per design language).
  */
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 fun BrowseScreen(
     api: AniListApi,
@@ -79,10 +80,31 @@ fun BrowseScreen(
         }
     }
 
+    // Manual refresh function — called on pull-to-refresh.
+    // Forces a network fetch regardless of cache freshness.
+    val manualRefresh: () -> Unit = {
+        if (!isRefreshing) {
+            isRefreshing = true
+            scope.launch {
+                val result = runCatching { api.fetchTrending(perPage = 30) }
+                val freshData = result.getOrDefault(emptyList())
+                if (freshData.isNotEmpty()) {
+                    anime = freshData
+                    error = null
+                }
+                isRefreshing = false
+            }
+        }
+    }
+
     // Fetch trending — stale-while-revalidate pattern.
     // If cache exists: show it immediately (loading=false), refresh in background.
     // If no cache: show loading spinner, fetch from network.
     // If refresh fails: keep showing old cached data (don't clear it).
+    // NOTE: With the local persistent cache, fetchTrending() now returns the
+    // local cache if it's < 24h old — so this LaunchedEffect won't make a
+    // network call unless the cache is stale. This implements the "refresh
+    // once a day" behavior the user requested.
     LaunchedEffect(Unit) {
         if (cached != null) {
             // Cache exists — refresh in background, keep showing old data
@@ -109,11 +131,17 @@ fun BrowseScreen(
             loading && anime.isEmpty() -> LoadingState()
             error != null && anime.isEmpty() -> ErrorState(message = error!!)
             anime.isEmpty() -> EmptyState()
-            else -> AnimeGrid(
-                anime = anime,
-                gridState = gridState,
-                onOpenAnime = onOpenAnime,
-            )
+            else -> androidx.compose.material3.pulltorefresh.PullToRefreshBox(
+                isRefreshing = isRefreshing,
+                onRefresh = manualRefresh,
+                modifier = Modifier.fillMaxSize(),
+            ) {
+                AnimeGrid(
+                    anime = anime,
+                    gridState = gridState,
+                    onOpenAnime = onOpenAnime,
+                )
+            }
         }
     }
 }

@@ -29,6 +29,9 @@ dependencies {
     // TrueType parser — for subtitle font parsing
     implementation(anikutaLibs.truetypeparser)
 
+    // Coil3 — for episode thumbnails in the switching overlay
+    implementation("io.coil-kt.coil3:coil-compose:3.1.0")
+
     // Koin
     implementation(platform(libs.koin.bom))
     implementation(libs.koin.core)
