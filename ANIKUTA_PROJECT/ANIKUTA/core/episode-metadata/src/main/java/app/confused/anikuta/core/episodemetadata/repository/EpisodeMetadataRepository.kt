@@ -44,6 +44,7 @@ import kotlinx.coroutines.withContext
 class EpisodeMetadataRepository(
     private val registry: EpisodeMetadataSourceRegistry,
     private val preferences: EpisodeMetadataPreferences,
+    private val localCache: EpisodeMetadataCache? = null,
 ) {
     private val cache = mutableMapOf<Int, Map<Int, EpisodeMetadata>>()
 
@@ -51,8 +52,9 @@ class EpisodeMetadataRepository(
      * Fetch ALL episode metadata from all registered sources in parallel,
      * then merge per-field.
      *
-     * @param request The request containing anime ID, title, MAL ID, etc.
-     * @return Map<episodeNumber (1-based), EpisodeMetadata>. Empty if no data.
+     * Checks the local persistent cache first (survives app restart). If cached,
+     * returns immediately without a network call. If not cached, fetches from
+     * all sources, saves to the local cache, and returns.
      */
     suspend fun fetchAll(request: EpisodeMetadataRequest): Map<Int, EpisodeMetadata> =
         withContext(Dispatchers.IO) {
@@ -62,10 +64,21 @@ class EpisodeMetadataRepository(
                 return@withContext emptyMap()
             }
 
-            // Check cache first
+            // Check in-memory cache first
             cache[request.animeId]?.let { cached ->
-                Log.d(TAG, "Cache hit for animeId=${request.animeId} (${cached.size} episodes)")
+                Log.d(TAG, "In-memory cache hit for animeId=${request.animeId} (${cached.size} episodes)")
                 return@withContext cached
+            }
+
+            // Check local persistent cache (survives app restart)
+            if (localCache != null) {
+                val local = localCache.get(request.animeId)
+                if (local != null && local.isNotEmpty()) {
+                    Log.d(TAG, "Local cache hit for animeId=${request.animeId} (${local.size} episodes)")
+                    // Populate in-memory cache too
+                    cache[request.animeId] = local
+                    return@withContext local
+                }
             }
 
             val sources = registry.getSupported(request)
@@ -97,7 +110,6 @@ class EpisodeMetadataRepository(
             val fetchAirDates = preferences.fetchAirDates().get()
 
             // Merge per-field (first non-null wins, in source registration order)
-            // Fields the user disabled are set to null (not fetched)
             val episodeCount = request.episodeCount.coerceAtLeast(1)
             val merged = mutableMapOf<Int, EpisodeMetadata>()
             val fallbackThumb = if (fetchThumbnails) request.bannerImage else null
@@ -120,7 +132,6 @@ class EpisodeMetadataRepository(
                     if (ep.filler) filler = true
                 }
 
-                // Fallback thumbnail: use banner if no source had a per-episode thumbnail
                 if (thumbnailUrl == null && fallbackThumb != null && hasAnyData) {
                     thumbnailUrl = fallbackThumb
                 }
@@ -141,8 +152,9 @@ class EpisodeMetadataRepository(
 
             Log.i(TAG, "Merged ${merged.size} episodes for animeId=${request.animeId}")
 
-            // Cache the result
+            // Cache the result (both in-memory + local persistent)
             cache[request.animeId] = merged
+            localCache?.save(request.animeId, merged)
 
             merged
         }

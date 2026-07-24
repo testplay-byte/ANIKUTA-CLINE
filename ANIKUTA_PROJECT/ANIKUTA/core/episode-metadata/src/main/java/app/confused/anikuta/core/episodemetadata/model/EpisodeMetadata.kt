@@ -1,5 +1,7 @@
 package app.confused.anikuta.core.episodemetadata.model
 
+import kotlinx.serialization.Serializable
+
 /**
  * Per-episode metadata — the enriched data fetched from metadata sources.
  *
@@ -9,6 +11,7 @@ package app.confused.anikuta.core.episodemetadata.model
  *
  * Per ADR-024: the `lastFetched` field tracks when this metadata was last refreshed.
  */
+@Serializable
 data class EpisodeMetadata(
     val animeId: Int,
     val episodeNumber: Int,

@@ -1,6 +1,7 @@
 package app.confused.anikuta.core.episodemetadata.di
 
 import app.confused.anikuta.core.episodemetadata.EpisodeMetadataPreferences
+import app.confused.anikuta.core.episodemetadata.repository.EpisodeMetadataCache
 import app.confused.anikuta.core.episodemetadata.repository.EpisodeMetadataRepository
 import app.confused.anikuta.core.episodemetadata.source.EpisodeMetadataSourceRegistry
 import app.confused.anikuta.core.episodemetadata.source.anikage.AnikageCcSource
@@ -37,6 +38,7 @@ val episodeMetadataModule: Module = module {
     single { Json { ignoreUnknownKeys = true } }
     // Metadata preferences
     single { EpisodeMetadataPreferences(get()) }
+    single { EpisodeMetadataCache(get()) }
 
     single { EpisodeMetadataSourceRegistry() }
     single { JikanMalSource(get(), get()) }
@@ -47,6 +49,6 @@ val episodeMetadataModule: Module = module {
         registry.register(get<JikanMalSource>())
         registry.register(get<AnikageCcSource>())
         registry.register(get<AniListStreamingSource>())
-        EpisodeMetadataRepository(registry, get())
+        EpisodeMetadataRepository(registry, get(), get())
     }
 }
