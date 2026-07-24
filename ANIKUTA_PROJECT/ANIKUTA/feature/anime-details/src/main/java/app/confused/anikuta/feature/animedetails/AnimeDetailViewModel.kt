@@ -7,6 +7,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.confused.anikuta.core.anilist.api.AniListApi
 import app.confused.anikuta.core.anilist.model.AniListAnime
+import app.confused.anikuta.core.anilist.model.coverUrl
 import app.confused.anikuta.core.anilist.model.displayTitle
 import app.confused.anikuta.core.common.model.Anime
 import app.confused.anikuta.core.common.model.AnimeStatus
@@ -640,7 +641,7 @@ class AnimeDetailViewModel(
                     artist = null,
                     author = null,
                     description = anilistAnime?.description,
-                    genre = anilistAnime?.genres?.joinToString(",") ?: "",
+                    genre = anilistAnime?.genres ?: emptyList(),
                     coverUrl = anilistAnime?.coverUrl,
                     status = 0,
                     thumbnailUrl = null,
