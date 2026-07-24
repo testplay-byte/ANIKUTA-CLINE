@@ -89,6 +89,7 @@ fun EpisodesSection(
     onManualSearch: suspend (Long, String) -> Unit,
     onLinkManual: (AnimeCatalogueSource, SAnime) -> Unit,
     onClearManualSearch: () -> Unit,
+    showMetadataLoading: Boolean = true,
 ) {
     var showManualSearch by remember { mutableStateOf(false) }
 
@@ -121,7 +122,7 @@ fun EpisodesSection(
                 // "Episodes" while metadata is being fetched in the background.
                 // When episodes are loaded but metadata map is still empty,
                 // the fetch is in progress.
-                if (episodeState is EpisodeState.Loaded && episodeMetadata.isEmpty()) {
+                if (showMetadataLoading && episodeState is EpisodeState.Loaded && episodeMetadata.isEmpty()) {
                     Spacer(modifier = Modifier.size(8.dp))
                     CircularProgressIndicator(
                         modifier = Modifier.size(14.dp),

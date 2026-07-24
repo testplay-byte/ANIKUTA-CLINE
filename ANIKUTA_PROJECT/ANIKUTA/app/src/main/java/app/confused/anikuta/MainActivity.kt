@@ -420,6 +420,11 @@ private fun AnikutaApp() {
                             coverUrl = extSAnime.thumbnail_url,
                         ))
                     },
+                    onRelinkAnilist = {
+                        // Close the extension page + open the linking sheet
+                        extensionDetailTarget = null
+                        linkingTarget = extSource to extSAnime
+                    },
                 )
             }
             // Tab content

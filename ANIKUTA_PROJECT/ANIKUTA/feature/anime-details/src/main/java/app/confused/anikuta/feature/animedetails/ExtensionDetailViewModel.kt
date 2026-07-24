@@ -212,6 +212,7 @@ class ExtensionDetailViewModel(
                         favorite = newFav,
                         dateAdded = if (newFav) System.currentTimeMillis() else existing.dateAdded,
                     )
+                    _isSaved.value = newFav
                     if (newFav) {
                         categoryRepository.setAnimeCategories(existing.id, listOf(Category.DEFAULT_ID))
                     }
@@ -248,6 +249,7 @@ class ExtensionDetailViewModel(
                     )
                     val newId = animeRepository.upsert(newAnime)
                     categoryRepository.setAnimeCategories(newId, listOf(Category.DEFAULT_ID))
+                    _isSaved.value = true
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "toggleSave failed", e)

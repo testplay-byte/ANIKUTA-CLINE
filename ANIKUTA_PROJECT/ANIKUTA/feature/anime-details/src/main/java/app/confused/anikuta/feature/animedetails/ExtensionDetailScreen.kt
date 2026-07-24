@@ -220,6 +220,7 @@ private fun ExtensionDetailContent(
                 onManualSearch = { _, _ -> },
                 onLinkManual = { _, _ -> },
                 onClearManualSearch = {},
+                showMetadataLoading = false, // Extension-only anime has no metadata
             )
         }
     }
