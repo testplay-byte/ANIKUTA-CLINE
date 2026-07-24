@@ -476,7 +476,7 @@ class AnimeDetailViewModel(
                         url = savedLink.animeUrl
                         title = savedLink.animeTitle
                     }
-                    val match = SourceMatcher.SourceMatch(source, sAnime, 100)
+                    val match = SourceMatcher.SourceMatch(source, sAnime, 1.0)
                     _currentMatch.value = match
                     _allMatches.value = listOf(match)
                     // Still search for other matches in the background (for the switcher)
