@@ -64,6 +64,7 @@ fun AnimeDetailScreen(
     val animeRepository: app.confused.anikuta.core.common.repository.AnimeRepository = org.koin.core.context.GlobalContext.get().get()
     val categoryRepository: app.confused.anikuta.core.common.repository.CategoryRepository = org.koin.core.context.GlobalContext.get().get()
     val episodeMetadataRepository: app.confused.anikuta.core.episodemetadata.repository.EpisodeMetadataRepository = org.koin.core.context.GlobalContext.get().get()
+    val sourceLinkStore: app.confused.anikuta.data.extension.cache.SourceLinkStore = org.koin.core.context.GlobalContext.get().get()
 
     @Suppress("UNCHECKED_CAST")
     val vm: AnimeDetailViewModel = viewModel(
@@ -78,6 +79,7 @@ fun AnimeDetailScreen(
                     animeRepository = animeRepository,
                     categoryRepository = categoryRepository,
                     extensionLinkStore = extensionLinkStore,
+                    sourceLinkStore = sourceLinkStore,
                     episodeMetadataRepository = episodeMetadataRepository,
                     appContext = context.applicationContext,
                 ) as T

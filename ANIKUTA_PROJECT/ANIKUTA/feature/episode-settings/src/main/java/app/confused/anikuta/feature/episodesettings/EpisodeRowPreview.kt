@@ -155,7 +155,7 @@ private fun PreviewEpisodeRow(
                         if (prefs.showTitles) {
                             if (prefs.showTitleBackground) {
                                 Surface(
-                                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.5f),
                                     shape = RoundedCornerShape(8.dp),
                                     modifier = Modifier.fillMaxWidth(),
                                 ) {
@@ -216,7 +216,7 @@ private fun PreviewEpisodeRow(
                 Spacer(Modifier.size(8.dp))
                 if (prefs.showSynopsisBackground) {
                     Surface(
-                        color = MaterialTheme.colorScheme.surfaceContainerLow,
+                        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.35f),
                         shape = RoundedCornerShape(8.dp),
                         modifier = Modifier.fillMaxWidth(),
                     ) {

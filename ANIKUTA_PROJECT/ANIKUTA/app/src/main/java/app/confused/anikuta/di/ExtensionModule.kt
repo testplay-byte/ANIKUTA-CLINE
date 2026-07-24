@@ -5,6 +5,7 @@ import app.confused.anikuta.core.updatechecker.EpisodeFetchGateway
 import app.confused.anikuta.data.extension.AnimeExtensionManager
 import app.confused.anikuta.data.extension.api.AnimeExtensionApi
 import app.confused.anikuta.data.extension.cache.ExtensionLinkStore
+import app.confused.anikuta.data.extension.cache.SourceLinkStore
 import app.confused.anikuta.data.extension.installer.AnimeExtensionInstaller
 import app.confused.anikuta.data.extension.loader.AnimeExtensionLoader
 import app.confused.anikuta.data.extension.matcher.SourceMatcher
@@ -69,6 +70,11 @@ val extensionModule: Module = module {
     // Depends on PreferenceStore (provided by preferenceModule). Shared between
     // :feature:search (linking sheet) and the future extension-only detail page.
     single { ExtensionLinkStore(get()) }
+
+    // ── SourceLinkStore (persists the source match for an AniList anime) ──
+    // Stores sourceId + SAnime URL + title so the details page can directly
+    // call getEpisodeList() without re-searching on every app open.
+    single { SourceLinkStore(get()) }
 
     // ── Agent 1: EpisodeFetchGateway ──
     // Binds the :core:update-checker interface to the :data:extension impl.

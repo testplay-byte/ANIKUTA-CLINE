@@ -60,6 +60,7 @@ class AnimeDetailViewModel(
     private val animeRepository: AnimeRepository,
     private val categoryRepository: CategoryRepository,
     private val extensionLinkStore: app.confused.anikuta.data.extension.cache.ExtensionLinkStore,
+    private val sourceLinkStore: app.confused.anikuta.data.extension.cache.SourceLinkStore,
     private val episodeMetadataRepository: app.confused.anikuta.core.episodemetadata.repository.EpisodeMetadataRepository,
     private val appContext: Context,
 ) : ViewModel() {
@@ -421,6 +422,8 @@ class AnimeDetailViewModel(
         _currentMatch.value = match
         _allMatches.value = listOf(match)
         sourcePrefs.edit().putLong(sourcePrefKey(anilistId), source.id).apply()
+        // Save the full source link so we don't re-search next time
+        sourceLinkStore.saveLink(anilistId, source.id, sAnime.url, sAnime.title)
         Toast.makeText(appContext, "Linked to ${source.name}", Toast.LENGTH_SHORT).show()
         Log.i(TAG, "Manual link: '${sAnime.title}' from '${source.name}'")
         loadEpisodes(match)
@@ -455,15 +458,46 @@ class AnimeDetailViewModel(
 
     private fun findAndLoadEpisodes(anime: AniListAnime) {
         viewModelScope.launch {
+            // ── Check SourceLinkStore first: if we already have a saved match,
+            // skip the search entirely and directly load episodes from that source.
+            // Per user: "the source was not saved either... it tries to search on
+            // the sources every single time instead of directly knowing that this
+            // source is already linked."
+            val savedLink = sourceLinkStore.getLink(anilistId)
+            if (savedLink != null) {
+                Log.i(TAG, "Found saved source link: sourceId=${savedLink.sourceId}, url=${savedLink.animeUrl}")
+                // Find the source by ID from the source matcher
+                val source = withContext(Dispatchers.IO) {
+                    sourceMatcher.getSourceById(savedLink.sourceId)
+                }
+                if (source != null) {
+                    // Reconstruct SAnime from the saved URL + title
+                    val sAnime = eu.kanade.tachiyomi.animesource.model.SAnimeImpl().apply {
+                        url = savedLink.animeUrl
+                        title = savedLink.animeTitle
+                    }
+                    val match = SourceMatcher.SourceMatch(source, sAnime, 100)
+                    _currentMatch.value = match
+                    _allMatches.value = listOf(match)
+                    // Still search for other matches in the background (for the switcher)
+                    // but DON'T block episode loading on it.
+                    launch { searchAllSourcesInBackground(anime.displayTitle) }
+                    loadEpisodes(match)
+                    return@launch
+                } else {
+                    // Source not found (extension uninstalled?) — fall through to search
+                    Log.w(TAG, "Saved source ${savedLink.sourceId} not found — falling back to search")
+                    sourceLinkStore.removeLink(anilistId)
+                }
+            }
+
             _episodeState.value = EpisodeState.Searching
             val title = anime.displayTitle
             Log.i(TAG, "Searching sources for '$title' (anilistId=$anilistId)")
 
             try {
-                // Search all sources (for the switcher) + get all matches.
                 val all = sourceMatcher.matchAll(title)
                 _allMatches.value = all
-                // Capture per-source errors so the UI can show WHY auto-match failed.
                 _autoMatchErrors.value = sourceMatcher.lastMatchAllErrors
 
                 if (all.isEmpty()) {
@@ -481,14 +515,6 @@ class AnimeDetailViewModel(
                     return@launch
                 }
 
-                // Check if the user has a persisted source preference for this anime.
-                // Two sources of preference, in priority order:
-                //   1. SharedPreferences (set when the user manually switches source
-                //      via the source switcher — explicit user choice).
-                //   2. ExtensionLinkStore reverse lookup (the source the user came
-                //      from via the search→link flow — fixes the owner's report:
-                //      "it does not load the episodes from the exact same extension
-                //      from which I went to the details page").
                 val explicitPrefId = sourcePrefs.getLong(sourcePrefKey(anilistId), -1L)
                 val linkedPrefId = extensionLinkStore.getPreferredSourceForAnilist(anilistId)
                 val preferredSourceId = when {
@@ -504,12 +530,33 @@ class AnimeDetailViewModel(
                     "Selected source: '${selected.source.name}' (score=${selected.score}, " +
                         "preferredId=$preferredSourceId, explicit=$explicitPrefId, linked=$linkedPrefId)",
                 )
+
+                // ── Save the source link so we don't re-search next time ──
+                sourceLinkStore.saveLink(
+                    anilistId = anilistId,
+                    sourceId = selected.source.id,
+                    animeUrl = selected.sAnime.url,
+                    animeTitle = selected.sAnime.title,
+                )
+
                 loadEpisodes(selected)
             } catch (e: Throwable) {
-                // Catch Throwable — see loadAnimeDetails for rationale.
                 Log.e(TAG, "Source matching failed for '$title'", e)
                 _episodeState.value = EpisodeState.Error("Search failed: ${e.message}")
                 Toast.makeText(appContext, "Failed to search sources: ${e.message}", Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+
+    /** Searches all sources in the background (for the source switcher) without blocking. */
+    private fun searchAllSourcesInBackground(title: String) {
+        viewModelScope.launch {
+            try {
+                val all = sourceMatcher.matchAll(title)
+                _allMatches.value = all
+                _autoMatchErrors.value = sourceMatcher.lastMatchAllErrors
+            } catch (e: Exception) {
+                Log.w(TAG, "Background source search failed (non-fatal)", e)
             }
         }
     }

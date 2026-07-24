@@ -333,6 +333,14 @@ class SourceMatcher(
             .filterIsInstance<AnimeCatalogueSource>()
     }
 
+    /**
+     * Gets a catalogue source by its ID. Public so the details page can
+     * directly look up a saved source (from SourceLinkStore) without re-searching.
+     */
+    fun getSourceById(sourceId: Long): AnimeCatalogueSource? {
+        return getCatalogueSources().firstOrNull { it.id == sourceId }
+    }
+
     // ── Title matching helpers ──
 
     private fun normalizeTitle(title: String): String {

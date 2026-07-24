@@ -975,7 +975,7 @@ private fun WatchScreenContent(
                             .fillMaxWidth()
                             .padding(horizontal = 0.dp, vertical = 8.dp),
                         shape = RoundedCornerShape(0.dp),
-                        color = MaterialTheme.colorScheme.surfaceContainerLow,
+                        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.35f),
                         tonalElevation = 1.dp,
                     ) {
                         EpisodeDescriptionSection(
@@ -1002,7 +1002,7 @@ private fun WatchScreenContent(
                             .fillMaxWidth()
                             .padding(horizontal = 0.dp, vertical = 4.dp),
                         shape = RoundedCornerShape(0.dp),
-                        color = MaterialTheme.colorScheme.surfaceContainerLow,
+                        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.35f),
                         tonalElevation = 1.dp,
                     ) {
                         Column(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
@@ -1629,7 +1629,7 @@ private fun EpisodeRow(
                         if (displayPrefs.showTitles) {
                             if (displayPrefs.showTitleBackground) {
                                 Surface(
-                                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.5f),
                                     shape = RoundedCornerShape(8.dp),
                                     modifier = Modifier.fillMaxWidth(),
                                 ) {
@@ -1700,7 +1700,7 @@ private fun EpisodeRow(
                 Spacer(Modifier.size(8.dp))
                 if (displayPrefs.showSynopsisBackground) {
                     Surface(
-                        color = MaterialTheme.colorScheme.surfaceContainerLow,
+                        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.35f),
                         shape = RoundedCornerShape(8.dp),
                         modifier = Modifier.fillMaxWidth(),
                     ) {

@@ -91,10 +91,10 @@ fun SynopsisSection(description: String) {
             fontSize = 14.sp,
             fontWeight = FontWeight.Normal,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = if (expanded) Int.MAX_VALUE else 4,
+            maxLines = if (expanded) Int.MAX_VALUE else 2,
             overflow = TextOverflow.Ellipsis,
         )
-        if (cleanDesc.length > 200) {
+        if (cleanDesc.length > 100) {
             Text(
                 text = if (expanded) "Show less" else "Show more",
                 fontFamily = RobotoFamily,
