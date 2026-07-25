@@ -61,7 +61,8 @@ class AnikutaBackupFormat : BackupFormat {
         container: BackupContainer,
         covers: Map<Int, ByteArray>,
         output: OutputStream,
-    ) = withContext(Dispatchers.IO) {
+    ) {
+        withContext(Dispatchers.IO) {
         try {
             val jsonBytes = json.encodeToString(container).toByteArray(Charsets.UTF_8)
             ZipOutputStream(output).use { zip ->
@@ -83,9 +84,12 @@ class AnikutaBackupFormat : BackupFormat {
                 }
             }
             Log.i(TAG, "ANIKUTA backup written: ${container.entries.size} entries, ${covers.size} covers")
+        } catch (e: BackupException) {
+            throw e
         } catch (e: Exception) {
             Log.e(TAG, "Failed to write ANIKUTA backup", e)
             throw BackupException.CorruptFile("write failed: ${e.message}", e)
+        }
         }
     }
 

@@ -4,7 +4,6 @@ import android.util.Log
 import app.confused.anikuta.core.backup.BackupCategory
 import app.confused.anikuta.core.backup.BackupEntry
 import app.confused.anikuta.core.backup.BackupProvider
-import app.confused.anikuta.core.backup.model.EpisodeMetadataBackup
 import app.confused.anikuta.core.backup.model.EpisodeMetadataItem
 import app.confused.anikuta.core.episodemetadata.model.EpisodeMetadata
 import app.confused.anikuta.core.episodemetadata.repository.EpisodeMetadataCache
@@ -20,13 +19,13 @@ private const val TAG = "AnikutaBackup"
  * Backs up enriched episode metadata (titles, descriptions, thumbnails, air
  * dates from Jikan/MAL/AniList sources).
  *
- * Export reads the [EpisodeMetadataCache] for all anime. Import overwrites the
- * cache for each anime (no merge — the backup is treated as authoritative for
- * the included anime).
+ * Export reads [EpisodeMetadataCache.getAll] — `Map<String, String>` where the
+ * outer key is the animeId and the inner value is a JSON string of
+ * `Map<Int, EpisodeMetadata>`. We parse each JSON string and convert to
+ * `Map<String, EpisodeMetadataItem>` for serialization.
  *
- * This is optional (default off) because metadata can be re-fetched from
- * sources. It's useful for offline restore or to avoid re-fetching on a new
- * device.
+ * Import overwrites the cache for each anime. This is optional (default off)
+ * because metadata can be re-fetched from sources.
  */
 class EpisodeMetadataBackupProvider(
     private val metadataCache: EpisodeMetadataCache,
@@ -34,15 +33,16 @@ class EpisodeMetadataBackupProvider(
 
     override val id: String = BackupCategory.EPISODE_METADATA.id
 
+    private val json = Json { ignoreUnknownKeys = true }
+    private val metadataSerializer = MapSerializer(
+        Int.serializer(),
+        EpisodeMetadata.serializer(),
+    )
+
     override suspend fun export(): BackupEntry = withContext(Dispatchers.IO) {
         try {
             val rawCache = metadataCache.getAll()
-            val byAnime = mutableMapOf<String, EpisodeMetadataBackup>()
-            val json = Json { ignoreUnknownKeys = true }
-            val metadataSerializer = MapSerializer(
-                Int.serializer(),
-                EpisodeMetadata.serializer(),
-            )
+            val byAnime = mutableMapOf<String, Map<String, EpisodeMetadataItem>>()
             rawCache.forEach { (animeIdStr, jsonStr) ->
                 try {
                     val metadataMap = json.decodeFromString(metadataSerializer, jsonStr)
@@ -57,7 +57,7 @@ class EpisodeMetadataBackupProvider(
                             lastFetched = meta.lastFetched,
                         )
                     }.toMap()
-                    byAnime[animeIdStr] = EpisodeMetadataBackup(byAnime = items)
+                    byAnime[animeIdStr] = items
                 } catch (e: Exception) {
                     Log.w(TAG, "EpisodeMetadata export: failed to parse cache for animeId=$animeIdStr — ${e.message}")
                 }
@@ -74,13 +74,12 @@ class EpisodeMetadataBackupProvider(
         require(entry is BackupEntry.EpisodeMetadata) { "Expected EpisodeMetadata entry, got ${entry.providerId}" }
         if (entry.byAnime.isEmpty()) return@withContext false
         var imported = 0
-        entry.byAnime.forEach { (animeIdStr, metadataBackup) ->
+        entry.byAnime.forEach { (animeIdStr, episodes) ->
             try {
                 val animeId = animeIdStr.toIntOrNull() ?: return@forEach
-                if (metadataBackup.byAnime.isEmpty()) return@forEach
-                // Convert backup model → domain model and save
+                if (episodes.isEmpty()) return@forEach
                 val metadataMap = mutableMapOf<Int, EpisodeMetadata>()
-                metadataBackup.byAnime.forEach { (epNumStr, item) ->
+                episodes.forEach { (epNumStr, item) ->
                     val epNum = epNumStr.toIntOrNull() ?: return@forEach
                     metadataMap[epNum] = EpisodeMetadata(
                         animeId = animeId,

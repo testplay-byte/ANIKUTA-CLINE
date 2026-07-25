@@ -49,9 +49,7 @@ class AniyomiBackupFormat : BackupFormat {
 
     override val type: BackupFormatType = BackupFormatType.ANIYOMI
 
-    private val protoBuf = ProtoBuf {
-        ignoreUnknownKeys = true
-    }
+    private val protoBuf = ProtoBuf
 
     override suspend fun write(
         container: BackupContainer,

@@ -34,7 +34,7 @@ class CategoryBackupProvider(
             val categories = database.categoriesQueries
                 .selectAll(BackupMappers::mapCategory)
                 .executeAsList()
-            val links = database.animeCategoryQueries
+            val links = database.anime_categoryQueries
                 .selectAll(BackupMappers::mapAnimeCategory)
                 .executeAsList()
             Log.i(TAG, "Categories export: ${categories.size} categories, ${links.size} links")
