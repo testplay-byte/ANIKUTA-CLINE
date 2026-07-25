@@ -17,6 +17,10 @@ secrets/
 google-services.json
 **/credentials.json
 
+# ── CONTEXT credentials (agent persistent memory) ──
+CONTEXT/credentials/
+github_token.txt
+
 # ── OS / editor cruft ──
 .DS_Store
 Thumbs.db
