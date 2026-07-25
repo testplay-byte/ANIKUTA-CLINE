@@ -50,6 +50,7 @@ import java.util.Locale
  * @param onConfirm called when the user taps "Restore".
  * @param onCancel called when the user dismisses the sheet.
  */
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 fun RestoreConfirmSheet(
     summary: RestoreSummary,
@@ -169,7 +170,7 @@ private fun RestoreCategoryRow(result: app.confused.anikuta.core.backup.RestoreC
             )
             val countText = when {
                 result.skippedCount > 0 -> "${result.skippedCount} items"
-                result.note != null -> result.note
+                !result.note.isNullOrBlank() -> result.note!!
                 else -> "No data"
             }
             Text(
