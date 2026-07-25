@@ -143,6 +143,8 @@ private fun AnikutaApp() {
     // History + Updates full-screen sub-pages, reached from the More screen.
     var showHistory by remember { mutableStateOf(false) }
     var showUpdates by remember { mutableStateOf(false) }
+    // ── Agent 1: Backup & Restore ──
+    var showBackup by remember { mutableStateOf(false) }
     val anilistApi = remember {
         val prefStore = org.koin.core.context.GlobalContext.get().get<app.confused.anikuta.core.preferences.PreferenceStore>()
         AniListApi(localCache = app.confused.anikuta.core.anilist.api.LocalAniListCache(prefStore))
@@ -182,7 +184,7 @@ private fun AnikutaApp() {
 
     // Handle back gesture for sub-screens + resolver sheet + linking sheet + episode-settings sub-pages
     // ── Agent 1: History + Updates ── + ── Agent 2: Profile + Trackers ──
-    BackHandler(enabled = watchTarget != null || detailAnimeId != null || showExtensions || showSettings || showRepoSettings || resolverState !is VideoResolverState.Hidden || linkingTarget != null || extensionDetailTarget != null || episodeSettingsPage != null || showHistory || showUpdates || showProfile || showTrackers) {
+    BackHandler(enabled = watchTarget != null || detailAnimeId != null || showExtensions || showSettings || showRepoSettings || resolverState !is VideoResolverState.Hidden || linkingTarget != null || extensionDetailTarget != null || episodeSettingsPage != null || showHistory || showUpdates || showProfile || showTrackers || showBackup) {
         when {
             watchTarget != null -> watchTarget = null
             resolverState !is VideoResolverState.Hidden -> resolverState = VideoResolverState.Hidden
@@ -197,6 +199,8 @@ private fun AnikutaApp() {
             // ── Agent 1: History + Updates ──
             showHistory -> showHistory = false
             showUpdates -> showUpdates = false
+            // ── Agent 1: Backup & Restore ──
+            showBackup -> showBackup = false
             // ── Agent 2: Profile + Trackers ──
             showTrackers -> showTrackers = false
             showProfile -> showProfile = false
@@ -360,7 +364,14 @@ private fun AnikutaApp() {
                 SettingsScreen(
                     onOpenExtensions = { showExtensions = true },
                     onOpenEpisodeSettings = { episodeSettingsPage = app.confused.anikuta.feature.episodesettings.EpisodeSettingsPage.Hub },
+                    onOpenBackup = { showBackup = true },
                     onBack = { showSettings = false },
+                )
+            }
+            // ── Agent 1: Backup & Restore ──
+            showBackup -> {
+                app.confused.anikuta.feature.backup.BackupSettingsScreen(
+                    onBack = { showBackup = false },
                 )
             }
             // ── Agent 1: History + Updates ── (full-screen sub-pages from More)
@@ -628,6 +639,7 @@ private fun MoreScreen(
 private fun SettingsScreen(
     onOpenExtensions: () -> Unit,
     onOpenEpisodeSettings: () -> Unit,
+    onOpenBackup: () -> Unit = {},
     onBack: () -> Unit,
 ) {
     val scrollState = rememberScrollState()
@@ -654,6 +666,16 @@ private fun SettingsScreen(
                     title = "Episode settings",
                     subtitle = "Display, layout, and metadata fetching for the episode list",
                     onClick = onOpenEpisodeSettings,
+                )
+            }
+            // ── Agent 1: Backup & Restore ──
+            item {
+                SettingsSectionLabel("Data")
+                MoreRow(
+                    icon = Icons.Filled.AutoAwesome,
+                    title = "Backup & Restore",
+                    subtitle = "Back up your library, history, and preferences",
+                    onClick = onOpenBackup,
                 )
             }
         }
