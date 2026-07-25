@@ -3,7 +3,7 @@ package app.confused.anikuta.core.designsystem.theme
 import androidx.compose.ui.graphics.Color
 
 /**
- * ANIKUTA color palette — derived from the owner's chosen primary color #B1F256.
+ * ANIKUTA color palette — derived from the owner's chosen primary color #F25656.
  *
  * See `DESIGN_LANGUAGE/03-themes/anikuta-palette.md` for the full spec.
  * Structure adapted from the prototype (`PROTOTYPE_REFERENCE/Anime_App/.../theme/Color.kt`).
@@ -25,10 +25,10 @@ val TextMutedDark = Color(0xFFA89EC0)
 val TextSubtleDark = Color(0xFF6E6688)
 
 // ── Dark theme — M3 color roles ──────────────────────────────────────────────
-val PrimaryDark = Color(0xFFB1F256)
-val PrimaryFgDark = Color(0xFF1A2E00)
-val OnPrimaryContainerDark = Color(0xFFD4F5A0)
-val PrimaryContainerDark = Color(0xFF4A6B1A)
+val PrimaryDark = Color(0xFFF25656)
+val PrimaryFgDark = Color(0xFF2E0000)
+val OnPrimaryContainerDark = Color(0xFFF5A0A0)
+val PrimaryContainerDark = Color(0xFF6B1A1A)
 val SecondaryDark = Color(0xFFCCC2DC)
 val SecondaryContainerDark = Color(0xFF4A4458)
 val TertiaryDark = Color(0xFFEFB8C8)
@@ -52,10 +52,10 @@ val TextMutedLight = Color(0xFF49454F)
 val TextSubtleLight = Color(0xFF766C8E)
 
 // ── Light theme — M3 color roles ─────────────────────────────────────────────
-val PrimaryLight = Color(0xFF5A8C1A)
+val PrimaryLight = Color(0xFF8C1A1A)
 val PrimaryFgLight = Color(0xFFFFFFFF)
-val OnPrimaryContainerLight = Color(0xFF1A2E00)
-val PrimaryContainerLight = Color(0xFFD4F5A0)
+val OnPrimaryContainerLight = Color(0xFF2E0000)
+val PrimaryContainerLight = Color(0xFFF5A0A0)
 val SecondaryLight = Color(0xFF625B71)
 val SecondaryContainerLight = Color(0xFFE8DEF8)
 val TertiaryLight = Color(0xFF7D5260)

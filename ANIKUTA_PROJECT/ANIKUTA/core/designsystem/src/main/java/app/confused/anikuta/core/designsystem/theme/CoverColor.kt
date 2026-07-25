@@ -113,8 +113,8 @@ private fun ComposeColor.compositeOver(background: ComposeColor): ComposeColor {
     )
 }
 
-// Default ANIKUTA color scheme (lime green #B1F256)
-private val AnikutaPrimary = ComposeColor(0xFFB1F256)
+// Default ANIKUTA color scheme (lime red #F25656)
+private val AnikutaPrimary = ComposeColor(0xFFF25656)
 private val AnikutaDarkColorScheme = darkColorScheme(
     primary = AnikutaPrimary,
     onPrimary = ComposeColor.Black,
