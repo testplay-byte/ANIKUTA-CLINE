@@ -63,44 +63,46 @@ class TrackerBackupProviderImpl(
         }
     }
 
-    override suspend fun restore(data: TrackerBackupData) = withContext(Dispatchers.IO) {
-        try {
-            // Restore AniList credentials
-            if (data.anilistToken.isNotBlank()) {
-                preferenceStore.getString(KEY_ANILIST_TOKEN, "").set(data.anilistToken)
-                preferenceStore.getString(KEY_ANILIST_USERNAME, "").set(data.anilistUsername)
-                preferenceStore.getInt(KEY_ANILIST_USER_ID, 0).set(data.anilistUserId)
-                Log.i(TAG, "Tracker restore: AniList credentials restored")
-            }
-            // Restore MAL credentials
-            if (!data.malOAuthJson.isNullOrBlank()) {
-                preferenceStore.getString(KEY_MAL_OAUTH, "").set(data.malOAuthJson)
-                preferenceStore.getString(KEY_MAL_USERNAME, "").set(data.malUsername)
-                Log.i(TAG, "Tracker restore: MAL credentials restored")
-            }
-            // Restore bindings
-            var bindingsRestored = 0
-            data.bindings.forEach { track ->
-                try {
-                    trackRepository.bind(
-                        animeId = track.animeId,
-                        trackerId = track.trackerId.toInt(),
-                        remoteId = track.remoteId.toInt(),
-                        remoteUrl = track.remoteUrl,
-                        lastSeen = track.lastSeen,
-                        score = track.score,
-                        status = track.status,
-                        totalEpisodes = track.totalEpisodes,
-                        displayScore = track.displayScore,
-                    )
-                    bindingsRestored++
-                } catch (e: Exception) {
-                    Log.w(TAG, "Tracker restore: skipped binding animeId=${track.animeId} — ${e.message}")
+    override suspend fun restore(data: TrackerBackupData) {
+        withContext(Dispatchers.IO) {
+            try {
+                // Restore AniList credentials
+                if (data.anilistToken.isNotBlank()) {
+                    preferenceStore.getString(KEY_ANILIST_TOKEN, "").set(data.anilistToken)
+                    preferenceStore.getString(KEY_ANILIST_USERNAME, "").set(data.anilistUsername)
+                    preferenceStore.getInt(KEY_ANILIST_USER_ID, 0).set(data.anilistUserId)
+                    Log.i(TAG, "Tracker restore: AniList credentials restored")
                 }
+                // Restore MAL credentials
+                if (!data.malOAuthJson.isNullOrBlank()) {
+                    preferenceStore.getString(KEY_MAL_OAUTH, "").set(data.malOAuthJson)
+                    preferenceStore.getString(KEY_MAL_USERNAME, "").set(data.malUsername)
+                    Log.i(TAG, "Tracker restore: MAL credentials restored")
+                }
+                // Restore bindings
+                var bindingsRestored = 0
+                data.bindings.forEach { track ->
+                    try {
+                        trackRepository.bind(
+                            animeId = track.animeId,
+                            trackerId = track.trackerId.toInt(),
+                            remoteId = track.remoteId.toInt(),
+                            remoteUrl = track.remoteUrl,
+                            lastSeen = track.lastSeen,
+                            score = track.score,
+                            status = track.status,
+                            totalEpisodes = track.totalEpisodes,
+                            displayScore = track.displayScore,
+                        )
+                        bindingsRestored++
+                    } catch (e: Exception) {
+                        Log.w(TAG, "Tracker restore: skipped binding animeId=${track.animeId} — ${e.message}")
+                    }
+                }
+                Log.i(TAG, "Tracker restore: $bindingsRestored/${data.bindings.size} bindings restored")
+            } catch (e: Exception) {
+                Log.e(TAG, "Tracker restore failed", e)
             }
-            Log.i(TAG, "Tracker restore: $bindingsRestored/${data.bindings.size} bindings restored")
-        } catch (e: Exception) {
-            Log.e(TAG, "Tracker restore failed", e)
         }
     }
 
