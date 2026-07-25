@@ -83,7 +83,7 @@ class DefaultDownloadManager(
     override val completedDownloads: Flow<List<DownloadTask>> =
         queue.tasks.map { list -> list.filter { it.status == DownloadStatus.COMPLETED } }
 
-    override val allDownloads: Flow<List<DownloadTask>> = queue.tasks.asStateFlow()
+    override val allDownloads: Flow<List<DownloadTask>> = queue.tasks
 
     override suspend fun enqueueDownload(request: DownloadRequest): Long {
         if (request.videoUrl.isBlank()) {
