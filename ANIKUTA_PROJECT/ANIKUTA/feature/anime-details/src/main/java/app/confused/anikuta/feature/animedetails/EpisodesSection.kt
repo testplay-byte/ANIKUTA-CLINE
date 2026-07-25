@@ -19,11 +19,13 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.outlined.VideoLibrary
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -530,12 +532,12 @@ private fun EpisodeRow(
             // Shown when the pref is on. Triggers [onDownload] which enqueues the
             // episode for download via the DownloadOrchestrator (wired in MainActivity).
             if (showDownloadBtn) {
-                androidx.compose.material3.IconButton(
+                IconButton(
                     onClick = onDownload,
                     modifier = Modifier.size(36.dp),
                 ) {
-                    androidx.compose.material3.Icon(
-                        imageVector = androidx.compose.material.icons.Icons.Filled.Download,
+                    Icon(
+                        imageVector = Icons.Filled.Download,
                         contentDescription = "Download episode",
                         tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(20.dp),
