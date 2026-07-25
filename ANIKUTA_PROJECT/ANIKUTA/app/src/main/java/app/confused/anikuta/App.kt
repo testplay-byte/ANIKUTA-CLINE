@@ -4,6 +4,7 @@ import android.app.Application
 import android.content.Context
 import android.util.Log
 import app.confused.anikuta.di.databaseModule
+import app.confused.anikuta.di.downloadAppModule
 import app.confused.anikuta.di.extensionModule
 import app.confused.anikuta.di.repositoryModule
 import app.confused.anikuta.feature.history.di.historyModule
@@ -96,6 +97,8 @@ class App : Application() {
                 app.confused.anikuta.core.tracker.di.trackerModule,
                 app.confused.anikuta.feature.my.di.myModule,
                 app.confused.anikuta.feature.trackers.di.trackersModule,
+                // ── Agent 2: Downloads & Offline Playback ──
+                downloadAppModule,
             )
         }
 

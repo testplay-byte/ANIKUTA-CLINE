@@ -90,6 +90,8 @@ fun EpisodesSection(
     onLinkManual: (AnimeCatalogueSource, SAnime) -> Unit,
     onClearManualSearch: () -> Unit,
     showMetadataLoading: Boolean = true,
+    /** Agent 2 — Downloads: invoked when the user taps the download button on an episode row. */
+    onDownloadEpisode: (SEpisode, AnimeSource) -> Unit = { _, _ -> },
 ) {
     var showManualSearch by remember { mutableStateOf(false) }
 
@@ -209,6 +211,7 @@ fun EpisodesSection(
                 onOpenEpisode = onOpenEpisode,
                 currentSource = currentMatch?.source,
                 onToggleWatched = onToggleWatched,
+                onDownloadEpisode = onDownloadEpisode,
             )
             is EpisodeState.NoMatch -> NoSourcesState(
                 onSearchManually = { showManualSearch = true },
@@ -271,6 +274,7 @@ private fun EpisodeList(
     onOpenEpisode: (SEpisode, AnimeSource, List<SEpisode>) -> Unit,
     currentSource: AnimeSource?,
     onToggleWatched: (String) -> Unit,
+    onDownloadEpisode: (SEpisode, AnimeSource) -> Unit = { _, _ -> },
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
         episodes.forEachIndexed { index, episode ->
@@ -288,6 +292,9 @@ private fun EpisodeList(
                     }
                 },
                 onToggleWatched = { onToggleWatched(episode.url) },
+                onDownload = {
+                    currentSource?.let { source -> onDownloadEpisode(episode, source) }
+                },
             )
         }
         Spacer(modifier = Modifier.height(16.dp))
@@ -342,6 +349,7 @@ private fun EpisodeRow(
     displayPrefs: EpisodeDisplayPrefs? = null,
     onClick: () -> Unit,
     onToggleWatched: () -> Unit,
+    onDownload: () -> Unit = {},
 ) {
     // Background matches the More screen button background (surfaceVariant@0.4f).
     val cardColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
@@ -360,6 +368,7 @@ private fun EpisodeRow(
     val showDateBg = displayPrefs?.showDateBackground ?: true
     val showAudioBg = displayPrefs?.showAudioBackground ?: true
     val showSynopsisBg = displayPrefs?.showSynopsisBackground ?: true
+    val showDownloadBtn = displayPrefs?.showDownloadButton ?: true
 
     // Use metadata title if available, otherwise parse the extension title
     val displayTitle = metadata?.title
@@ -515,6 +524,23 @@ private fun EpisodeRow(
             } else if (thumbnailUrl != null || showNumber) {
                 // No title and no meta — fill remaining space so thumbnail keeps natural size
                 Spacer(modifier = Modifier.weight(1f))
+            }
+
+            // ── Download button (Agent 2 — Downloads & Offline Playback) ──
+            // Shown when the pref is on. Triggers [onDownload] which enqueues the
+            // episode for download via the DownloadOrchestrator (wired in MainActivity).
+            if (showDownloadBtn) {
+                androidx.compose.material3.IconButton(
+                    onClick = onDownload,
+                    modifier = Modifier.size(36.dp),
+                ) {
+                    androidx.compose.material3.Icon(
+                        imageVector = androidx.compose.material.icons.Icons.Filled.Download,
+                        contentDescription = "Download episode",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(20.dp),
+                    )
+                }
             }
         }
 
@@ -809,11 +835,12 @@ private fun rememberEpisodeDisplaySnapshot(prefs: EpisodeDisplayPreferences): Ep
     val showDateBg by prefs.showDateBackground().changes().collectAsState(initial = prefs.showDateBackground().get())
     val showAudioBg by prefs.showAudioBackground().changes().collectAsState(initial = prefs.showAudioBackground().get())
     val showSynopsisBg by prefs.showSynopsisBackground().changes().collectAsState(initial = prefs.showSynopsisBackground().get())
+    val showDownloadBtn by prefs.showDownloadButton().changes().collectAsState(initial = prefs.showDownloadButton().get())
 
     return remember(
         showNumber, showTitles, showSummaries, showThumbnails, showDates, showAudioPills,
         thumbPos, titlePos, synopsisPos, datePos, epNumPos, thumbSize, titleLines, synopsisLines,
-        showTitleBg, showDateBg, showAudioBg, showSynopsisBg,
+        showTitleBg, showDateBg, showAudioBg, showSynopsisBg, showDownloadBtn,
     ) {
         EpisodeDisplayPrefs(
             showThumbnails = showThumbnails,
@@ -834,6 +861,7 @@ private fun rememberEpisodeDisplaySnapshot(prefs: EpisodeDisplayPreferences): Ep
             showDateBackground = showDateBg,
             showAudioBackground = showAudioBg,
             showSynopsisBackground = showSynopsisBg,
+            showDownloadButton = showDownloadBtn,
         )
     }
 }
@@ -869,6 +897,8 @@ data class EpisodeDisplayPrefs(
     val showDateBackground: Boolean = true,
     val showAudioBackground: Boolean = true,
     val showSynopsisBackground: Boolean = true,
+    /** Whether the download button is shown on the row (Agent 2 — Downloads). */
+    val showDownloadButton: Boolean = true,
 )
 
 /** Formats an episode number: 5.0f → "5", 5.5f → "5.5", -1f → "?". */

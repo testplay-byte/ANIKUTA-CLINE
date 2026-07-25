@@ -143,6 +143,9 @@ private fun AnikutaApp() {
     // History + Updates full-screen sub-pages, reached from the More screen.
     var showHistory by remember { mutableStateOf(false) }
     var showUpdates by remember { mutableStateOf(false) }
+    // ── Agent 2: Downloads & Offline Playback ──
+    // Downloads full-screen sub-page, reached from the More screen.
+    var showDownloads by remember { mutableStateOf(false) }
     val anilistApi = remember {
         val prefStore = org.koin.core.context.GlobalContext.get().get<app.confused.anikuta.core.preferences.PreferenceStore>()
         AniListApi(localCache = app.confused.anikuta.core.anilist.api.LocalAniListCache(prefStore))
@@ -150,6 +153,9 @@ private fun AnikutaApp() {
     val extensionManager: AnimeExtensionManager = koinInject()
     val sourceMatcher: SourceMatcher = koinInject()
     val resolverService = remember { ResolverService() }
+    // ── Agent 2: Downloads & Offline Playback ──
+    val downloadManager: app.confused.anikuta.core.download.DownloadManager = koinInject()
+    val downloadOrchestrator: app.confused.anikuta.download.DownloadOrchestrator = koinInject()
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
 
@@ -182,7 +188,7 @@ private fun AnikutaApp() {
 
     // Handle back gesture for sub-screens + resolver sheet + linking sheet + episode-settings sub-pages
     // ── Agent 1: History + Updates ── + ── Agent 2: Profile + Trackers ──
-    BackHandler(enabled = watchTarget != null || detailAnimeId != null || showExtensions || showSettings || showRepoSettings || resolverState !is VideoResolverState.Hidden || linkingTarget != null || extensionDetailTarget != null || episodeSettingsPage != null || showHistory || showUpdates || showProfile || showTrackers) {
+    BackHandler(enabled = watchTarget != null || detailAnimeId != null || showExtensions || showSettings || showRepoSettings || resolverState !is VideoResolverState.Hidden || linkingTarget != null || extensionDetailTarget != null || episodeSettingsPage != null || showHistory || showUpdates || showProfile || showTrackers || showDownloads) {
         when {
             watchTarget != null -> watchTarget = null
             resolverState !is VideoResolverState.Hidden -> resolverState = VideoResolverState.Hidden
@@ -197,6 +203,8 @@ private fun AnikutaApp() {
             // ── Agent 1: History + Updates ──
             showHistory -> showHistory = false
             showUpdates -> showUpdates = false
+            // ── Agent 2: Downloads ──
+            showDownloads -> showDownloads = false
             // ── Agent 2: Profile + Trackers ──
             showTrackers -> showTrackers = false
             showProfile -> showProfile = false
@@ -251,6 +259,12 @@ private fun AnikutaApp() {
      * Called when the user taps an episode on the detail screen.
      * Stores the full [episodeList] + [watchCtx] so the watch page can switch
      * episodes + render rich metadata.
+     *
+     * ── Agent 2: Offline playback ──
+     * FIRST checks [DownloadManager.isEpisodeDownloaded]. If a completed copy is
+     * on disk, builds the [WatchRequest] directly from the local file URI +
+     * local subtitle URIs (MPV plays content:// via `resolveUrlForMpv`) and
+     * skips the resolver sheet entirely. Otherwise falls through to streaming.
      */
     fun resolveEpisode(
         episode: SEpisode,
@@ -259,11 +273,51 @@ private fun AnikutaApp() {
         watchCtx: app.confused.anikuta.feature.animedetails.WatchEpisodeContext,
     ) {
         val epNum = episode.episode_number.toInt().let { if (it > 0) it else 0 }
-        resolveTarget = ResolveTarget(episode, source, episodeList, watchCtx)
-        resolverState = VideoResolverState.Resolving(epNum)
-        Log.i("AnikutaResolver", "Resolving: ${episode.name} from ${source.name} (${episodeList.size} episodes)")
+        val anilistId = detailAnimeId ?: 0
 
+        // ── Offline-playback short-circuit ──
         scope.launch {
+            try {
+                if (anilistId != 0 && downloadManager.isEpisodeDownloaded(anilistId, episode.url)) {
+                    val videoUri = downloadManager.getDownloadedVideoUri(anilistId, episode.url)
+                    val subUris = downloadManager.getDownloadedSubtitleUris(anilistId, episode.url)
+                    if (videoUri != null) {
+                        Log.i("AnikutaDownload", "Playing offline: ${episode.name} ($videoUri)")
+                        watchTarget = WatchRequest(
+                            videoUrl = videoUri,
+                            videoHeaders = null,
+                            videoTitle = episode.name,
+                            anilistId = anilistId,
+                            animeTitle = watchCtx.animeTitle,
+                            coverUrl = watchCtx.coverUrl,
+                            coverColor = null,
+                            episodeUrl = episode.url,
+                            episodeNumber = episode.episode_number,
+                            sourceId = source.id,
+                            source = source,
+                            videoServer = "",
+                            videoAudio = "",
+                            videoQuality = 0,
+                            episodeList = episodeList,
+                            episodeMetadata = watchCtx.episodeMetadata,
+                            subtitleTracks = subUris.map {
+                                app.confused.anikuta.feature.videoresolver.SubtitleTrack(it, "Downloaded")
+                            },
+                            audioTracks = emptyList(),
+                            resolvedServers = emptyList(),
+                        )
+                        return@launch
+                    }
+                }
+            } catch (e: Exception) {
+                Log.w("AnikutaDownload", "Offline check failed, falling back to stream", e)
+            }
+
+            // ── Streaming path (existing) ──
+            resolveTarget = ResolveTarget(episode, source, episodeList, watchCtx)
+            resolverState = VideoResolverState.Resolving(epNum)
+            Log.i("AnikutaResolver", "Resolving: ${episode.name} from ${source.name} (${episodeList.size} episodes)")
+
             when (val result = resolverService.resolve(source, episode)) {
                 is ResolverResult.Success -> {
                     resolverState = VideoResolverState.Show(epNum, result.servers)
@@ -276,6 +330,40 @@ private fun AnikutaApp() {
                     resolverState = VideoResolverState.Error(epNum, result.message)
                     Toast.makeText(context, "Failed to resolve: ${result.message}", Toast.LENGTH_LONG).show()
                 }
+            }
+        }
+    }
+
+    /**
+     * ── Agent 2: Downloads ──
+     * Enqueues a download for an episode. Called when the user taps the download
+     * button on an episode row. Resolves the video URL (same flow as watching)
+     * then enqueues via [DownloadOrchestrator]. Shows a toast with the result.
+     */
+    fun downloadEpisode(
+        episode: SEpisode,
+        source: AnimeSource,
+        watchCtx: app.confused.anikuta.feature.animedetails.WatchEpisodeContext,
+    ) {
+        val anilistId = detailAnimeId ?: 0
+        if (anilistId == 0) {
+            Toast.makeText(context, "Cannot download — anime not linked", Toast.LENGTH_SHORT).show()
+            return
+        }
+        val animeInfo = app.confused.anikuta.core.download.DownloadAnimeInfo(
+            anilistId = anilistId,
+            title = watchCtx.animeTitle.ifBlank { "Anime $anilistId" },
+            coverUrl = watchCtx.coverUrl,
+        )
+        scope.launch {
+            val result = downloadOrchestrator.enqueueDownload(animeInfo, episode, source)
+            when (result) {
+                is app.confused.anikuta.download.EnqueueResult.Success ->
+                    Toast.makeText(context, "Download queued", Toast.LENGTH_SHORT).show()
+                is app.confused.anikuta.download.EnqueueResult.NoSources ->
+                    Toast.makeText(context, "No video sources available", Toast.LENGTH_SHORT).show()
+                is app.confused.anikuta.download.EnqueueResult.Error ->
+                    Toast.makeText(context, result.message, Toast.LENGTH_LONG).show()
             }
         }
     }
@@ -307,6 +395,9 @@ private fun AnikutaApp() {
                     },
                     onOpenEpisode = { episode, source, episodeList, watchCtx ->
                         resolveEpisode(episode, source, episodeList, watchCtx)
+                    },
+                    onDownloadEpisode = { episode, source, watchCtx ->
+                        downloadEpisode(episode, source, watchCtx)
                     },
                 )
             }
@@ -380,6 +471,12 @@ private fun AnikutaApp() {
                         showUpdates = false
                         detailAnimeId = anilistId
                     },
+                )
+            }
+            // ── Agent 2: Downloads — full-screen page ──
+            showDownloads -> {
+                app.confused.anikuta.feature.download.DownloadsScreen(
+                    onBack = { showDownloads = false },
                 )
             }
             // ── Agent 2: Profile + Trackers — full-screen pages ──
@@ -461,6 +558,7 @@ private fun AnikutaApp() {
                         onOpenUpdates = { showUpdates = true },
                         onOpenProfile = { showProfile = true },
                         onOpenTrackers = { showTrackers = true },
+                        onOpenDownloads = { showDownloads = true },
                     )
                     else -> PlaceholderScreen(title = currentRoute.replaceFirstChar { it.uppercase() })
                 }
@@ -581,6 +679,7 @@ private fun MoreScreen(
     onOpenUpdates: () -> Unit,
     onOpenProfile: () -> Unit = {},
     onOpenTrackers: () -> Unit = {},
+    onOpenDownloads: () -> Unit = {},
 ) {
     val scrollState = rememberScrollState()
     Column(modifier = Modifier.fillMaxSize()) {
@@ -610,6 +709,12 @@ private fun MoreScreen(
                 HistoryUpdatesMoreEntries(
                     onOpenHistory = onOpenHistory,
                     onOpenUpdates = onOpenUpdates,
+                )
+            }
+            // ── Agent 2: Downloads ──
+            item {
+                app.confused.anikuta.feature.download.DownloadsMoreEntries(
+                    onOpenDownloads = onOpenDownloads,
                 )
             }
         }
