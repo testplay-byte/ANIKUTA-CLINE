@@ -300,7 +300,7 @@ class BackupManager(
             is BackupEntry.Library -> entry.animes.size
             is BackupEntry.AnimeDetails -> entry.animes.size
             is BackupEntry.Episodes -> entry.byAnime.values.sumOf { it.size }
-            is BackupEntry.EpisodeMetadata -> entry.byAnime.values.sumOf { it.byAnime.size }
+            is BackupEntry.EpisodeMetadata -> entry.byAnime.values.sumOf { it.size }
             is BackupEntry.WatchProgress -> entry.progress.entries.size
             is BackupEntry.SourceLinks -> entry.links.sourceLinks.size + entry.links.extensionLinks.size
             is BackupEntry.Tracker -> entry.data.bindings.size

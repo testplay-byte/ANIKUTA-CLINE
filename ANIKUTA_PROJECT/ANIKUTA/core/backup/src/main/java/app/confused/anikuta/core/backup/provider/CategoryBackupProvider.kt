@@ -67,7 +67,7 @@ class CategoryBackupProvider(
         // Phase 2: re-insert anime–category links with remapped IDs
         var linksImported = 0
         var linksSkipped = 0
-        database.animeCategoryQueries.transaction {
+        database.anime_categoryQueries.transaction {
             entry.links.forEach { link ->
                 try {
                     val newCategoryId = categoryIdRemap[link.categoryId]
@@ -82,7 +82,7 @@ class CategoryBackupProvider(
                     // (The Library/AnimeDetails provider restores the anime first;
                     //  we match by the same DB id if the restore happened in order.)
                     val localAnimeId = link.animeId // optimistic: same DB id if restored
-                    database.animeCategoryQueries.insert(
+                    database.anime_categoryQueries.insert(
                         animeId = localAnimeId,
                         categoryId = newCategoryId,
                         order = link.order,
